@@ -18,6 +18,7 @@ local function find_dbt_project()
   local current_dir = vim.fn.expand("%:p:h")
   local project_path = ""
 
+  -- TODO: replace with path separator to be os agnostic
   while current_dir ~= "/" do
     project_path = Path:new(current_dir, "dbt_project.yml"):absolute()
     if vim.fn.filereadable(project_path) == 1 then
@@ -43,33 +44,30 @@ function ManifestLoader:load_manifest(callback)
   local project_path = find_dbt_project()
 
   if project_path == "" then
-    print("dbt_project.yml not found!")
+    vim.notify_once("dbt_project.yml not found!")
     return
   end
 
   local manifest_path = find_manifest_json(project_path)
 
   if vim.fn.filereadable(manifest_path) ~= 1 then
-    print("manifest.json not found in the target folder!")
+    vim.notify_once("manifest.json not found in the target folder!")
     return
   end
 
-  -- Check if manifest data is already cached
-  if self.manifest_cache[manifest_path] then
-    callback(self.manifest_cache[manifest_path])
-  else
-    -- Read the manifest.json file and cache the data
+  if not self.manifest_cache[manifest_path] then
     local ok, data = pcall(vim.fn.json_decode, vim.fn.readfile(manifest_path))
-
     if ok then
       self.manifest_cache[manifest_path] = data
       callback(data)
     end
   end
+
+  callback(self.manifest_cache[manifest_path])
 end
 
--- TODO: Example usage remove later
-local loader = ManifestLoader.new()
+-- TODO: remove
+local loader = ManifestLoader:new()
 loader:load_manifest(function(manifest_table)
   -- Now you can use 'manifest_table' for further processing
   print("Manifest Table:", vim.inspect(manifest_table))
