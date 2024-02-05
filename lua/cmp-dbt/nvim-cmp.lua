@@ -1,20 +1,20 @@
 local M = {}
 
+local s = require("cmp-dbt.source")
+
 function M:new()
-  local cls = {
-    s = require("cmp-dbt.source"):new(),
-  }
+  local cls = { s = s:new() }
   setmetatable(cls, self)
   self.__index = self
+
   return cls
 end
 
 ---@param params cmp.SourceCompletionApiParams
 ---@param callback fun(response: lsp.CompletionResponse|nil)
 function M:complete(_, callback)
-  -- TODO:
-  -- local completion_items = self.s:get_completion()
-  callback { items = {}, mark = "[DB]" }
+  local completion_items = self.s:get_completion()
+  callback { items = completion_items, mark = "[dbt]" }
 end
 
 function M:is_available()
