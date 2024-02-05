@@ -18,7 +18,7 @@ local function find_dbt_project()
   local current_dir = vim.fn.expand("%:p:h")
   local project_path = ""
 
-  -- TODO: replace with path separator to be os agnostic
+  -- TODO: replace / with os separator and dbt_project.yml with yaml/yml
   while current_dir ~= "/" do
     project_path = Path:new(current_dir, "dbt_project.yml"):absolute()
     if vim.fn.filereadable(project_path) == 1 then
@@ -65,12 +65,5 @@ function ManifestLoader:load_manifest(callback)
 
   callback(self.manifest_cache[manifest_path])
 end
-
--- TODO: remove
-local loader = ManifestLoader:new()
-loader:load_manifest(function(manifest_table)
-  -- Now you can use 'manifest_table' for further processing
-  print("Manifest Table:", vim.inspect(manifest_table))
-end)
 
 return ManifestLoader
