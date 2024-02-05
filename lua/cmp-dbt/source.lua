@@ -15,13 +15,13 @@ function source:new()
 
   -- setup cron job to check for manifest changes
   cls.dbt:cron_manifest(function()
-    cls:handle_manifest_setter()
+    cls:set_manifest()
   end)
 
   return cls
 end
 
-function source:handle_manifest_setter()
+function source:set_manifest()
   self.dbt:load_manifest(function(manifest)
     self.manifest = manifest
     self.manifest_path = self.dbt.manifest_path
@@ -43,7 +43,7 @@ local function convert_many_to_completion_item(items)
     -- extract the last part of the model (has to be unique)
     k = k:match("([^.]*)$")
     table.insert(out, {
-      label = k,
+      label = '"' .. k .. '"',
       kind = vim.lsp.protocol.CompletionItemKind.Text,
       documentation = get_documentation(v),
     })
