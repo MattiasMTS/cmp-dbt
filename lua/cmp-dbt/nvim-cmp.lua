@@ -1,9 +1,9 @@
 local M = {}
 
+local s = require("cmp-dbt.source")
+
 function M:new()
-  local cls = {
-    s = require("cmp-dbt.source"):new(),
-  }
+  local cls = { s = s:new() }
   setmetatable(cls, self)
   self.__index = self
 
