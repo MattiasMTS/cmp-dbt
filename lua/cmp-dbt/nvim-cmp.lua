@@ -6,15 +6,15 @@ function M:new()
   }
   setmetatable(cls, self)
   self.__index = self
+
   return cls
 end
 
 ---@param params cmp.SourceCompletionApiParams
 ---@param callback fun(response: lsp.CompletionResponse|nil)
 function M:complete(_, callback)
-  -- TODO:
-  -- local completion_items = self.s:get_completion()
-  callback { items = {}, mark = "[DB]" }
+  local completion_items = self.s:get_completion()
+  callback { items = completion_items, mark = "[dbt]" }
 end
 
 function M:is_available()
