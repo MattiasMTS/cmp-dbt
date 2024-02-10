@@ -2,10 +2,10 @@ local Path = require("plenary.path")
 local context_manager = require("plenary.context_manager")
 
 -- ManifestLoader class definition
-local ManifestLoader = {}
+local Manifest = {}
 
 -- Constructor for ManifestLoader
-function ManifestLoader:new()
+function Manifest:new()
   local cls = {
     manifest_cache = {},
     manifest_path = nil,
@@ -44,7 +44,7 @@ local function find_manifest_json(project_path)
 end
 
 -- Public method to load the manifest.json asynchronously with caching
-function ManifestLoader:load_manifest(callback)
+function Manifest:load_manifest(callback)
   local project_path = find_dbt_project()
 
   if project_path == "" then
@@ -53,6 +53,7 @@ function ManifestLoader:load_manifest(callback)
     return
   end
 
+  -- TODO: do we want to use catalog.json instead of manifest.json?
   local manifest_path = find_manifest_json(project_path)
 
   if vim.fn.filereadable(manifest_path) ~= 1 then
@@ -77,7 +78,7 @@ function ManifestLoader:load_manifest(callback)
 end
 
 -- Check if the manifest file has been updated
-function ManifestLoader:manifest_updated(manifest_path)
+function Manifest:manifest_updated(manifest_path)
   local current_timestamp = vim.fn.getftime(manifest_path)
   if not self.last_manifest_timestamp or current_timestamp > self.last_manifest_timestamp then
     self.last_manifest_timestamp = current_timestamp
@@ -87,7 +88,7 @@ function ManifestLoader:manifest_updated(manifest_path)
 end
 
 -- Poll the manifest.json for changes
-function ManifestLoader:cron_manifest(callback)
+function Manifest:cron_manifest(callback)
   local timer = vim.loop.new_timer()
   timer:start(
     self.interval_ms,
@@ -100,4 +101,4 @@ function ManifestLoader:cron_manifest(callback)
   )
 end
 
-return ManifestLoader
+return Manifest
