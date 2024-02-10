@@ -57,15 +57,31 @@ end
 
 -- TODO: continue here, add e.g. column completion, macros, test, etc.
 function source:get_completion()
-  local nodes = self.manifest.nodes or {}
+  -- local macros = self.manifest.macros or {}
   local cursor_before_line = utils:get_cursor_before_line()
 
+  -- if source is found in the line, then we want to complete for source
   if cursor_before_line:match("source") then
     local cmp_sources = self:completion_for_source(cursor_before_line)
     return convert_many_to_completion_item(cmp_sources)
   end
 
+  -- default to nodes if no other completion is found
+  local nodes = self:completion_for_nodes(cursor_before_line)
   return convert_many_to_completion_item(nodes)
+end
+
+function source:completion_for_nodes(line)
+  local nodes = self.manifest.nodes or {}
+  -- local cursor_before_line = line or utils:get_cursor_before_line()
+
+  local out = {}
+  for k, v in pairs(nodes) do
+    k = k:match("([^.]*)$")
+    out[k] = v
+  end
+
+  return out
 end
 
 function source:completion_for_source(line)
