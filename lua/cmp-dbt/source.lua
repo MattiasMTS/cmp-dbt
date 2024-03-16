@@ -10,6 +10,7 @@ function source:new()
   local cls = {
     dbt = ma:new(),
     querier = queries:new(),
+    latest_ts_structure = {},
     manifest = {},
     manifest_path = "",
     found_sources = {},
@@ -39,7 +40,7 @@ local function get_documentation(item)
     return ""
   end
 
-  local ok, parsed = pcall(vim.fn.json_encode, item)
+  local ok, parsed = pcall(vim.json.encode, item)
   if ok then
     return parsed
   end
@@ -65,9 +66,15 @@ function source:get_completion()
   local out = {}
   local cursor_before_line = utils:get_cursor_before_line()
 
+  -- parse the buffer with the querier
   local cte_references = self.querier:get_cte_references()
   if cte_references then
     utils:merge_tables(out, cte_references)
+  end
+
+  local ts_structure = self.querier:get_model_and_alias_references()
+  if #ts_structure > 0 then
+    self.latest_ts_structure = ts_structure
   end
 
   -- if macro keyword found
@@ -86,9 +93,26 @@ function source:get_completion()
     return convert_many_to_completion_item(cmp_sources)
   end
 
+  if #self.latest_ts_structure > 0 then
+    for _, model in ipairs(self.latest_ts_structure) do
+      out[model.model] = { type = "model", alias = model.alias }
+    end
+  end
+
   local nodes = self:completion_for_nodes()
   if nodes then
     utils:merge_tables(out, nodes)
+  end
+
+  -- add columns to completion if they exist in metadata
+  if #self.latest_ts_structure > 0 then
+    for _, ts in ipairs(self.latest_ts_structure) do
+      local metadata = nodes[ts.model]
+      local columns = metadata.columns
+      if columns then
+        utils:merge_tables(out, columns)
+      end
+    end
   end
 
   return convert_many_to_completion_item(out)
