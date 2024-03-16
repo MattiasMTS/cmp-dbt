@@ -1,16 +1,19 @@
 -- source is the source of the completion items.
 local source = {}
 
--- local utils = require("cmp-dbt.utils")
 local ma = require("cmp-dbt.manifest")
+local constants = require("cmp-dbt.constants")
+local queries = require("cmp-dbt.queries")
 local utils = require("cmp-dbt.utils")
 
 function source:new()
   local cls = {
     dbt = ma:new(),
+    querier = queries:new(),
     manifest = {},
     manifest_path = "",
     found_sources = {},
+    enable_reserved_keywords = false, -- TODO: add from config later
   }
   setmetatable(cls, self)
   self.__index = self
@@ -40,17 +43,18 @@ local function get_documentation(item)
   if ok then
     return parsed
   end
+
   return ""
 end
 
 local function convert_many_to_completion_item(items)
   local out = {}
-  for k, v in pairs(items) do
+  for m, desc in pairs(items) do
+    -- TODO: add more metadata to the cmp menu,
+    -- e.g. kind being "cte", "model", "source", "macro", etc.
     table.insert(out, {
-      -- label = '"' .. k .. '"',
-      label = k,
-      kind = vim.lsp.protocol.CompletionItemKind.Text,
-      documentation = get_documentation(v),
+      label = m,
+      documentation = get_documentation(desc),
     })
   end
   return out
@@ -58,31 +62,49 @@ end
 
 -- TODO: continue here, add e.g. column completion, macros, test, etc.
 function source:get_completion()
-  -- local out = {}
+  local out = {}
   local cursor_before_line = utils:get_cursor_before_line()
 
-  -- if source is found in the line, then we want to complete for source
+  local cte_references = self.querier:get_cte_references()
+  if cte_references then
+    utils:merge_tables(out, cte_references)
+  end
+
+  -- if macro keyword found
+
+  -- reserved keywords
+  if self.enable_reserved_keywords then
+    for _, keyword in pairs(constants.reserved_sql_keywords) do
+      out[keyword.name] = { type = keyword.type, description = keyword.description }
+    end
+  end
+
+  -- if source keyword found
+  -- -> suggest models from sources
   if cursor_before_line:match("source") then
     local cmp_sources = self:completion_for_source(cursor_before_line)
     return convert_many_to_completion_item(cmp_sources)
   end
 
-  local nodes = self:completion_for_nodes(cursor_before_line)
-  return convert_many_to_completion_item(nodes)
+  local nodes = self:completion_for_nodes()
+  if nodes then
+    utils:merge_tables(out, nodes)
+  end
+
+  return convert_many_to_completion_item(out)
 end
 
-function source:completion_for_nodes(line)
+function source:completion_for_nodes()
   local nodes = self.manifest.nodes or {}
-  -- local cursor_before_line = line or utils:get_cursor_before_line()
 
   local out = {}
-  for k, v in pairs(nodes) do
-    -- skip tests
-    if k:match("test") then
+  for model, meta in pairs(nodes) do
+    -- skip tests, just a bunch of hashes
+    if model:match("test") then
     else
       -- captures the last part of the string -> model_name
-      k = k:match("([^.]*)$")
-      out[k] = v
+      model = model:match("([^.]*)$")
+      out[model] = meta
     end
   end
 
@@ -94,9 +116,9 @@ function source:completion_for_macros(line)
   local cursor_before_line = line or utils:get_cursor_before_line()
 
   local out = {}
-  for k, v in pairs(macros) do
-    k = k:match("([^.]*)$")
-    out[k] = v
+  for model, meta in pairs(macros) do
+    model = model:match("([^.]*)$")
+    out[model] = meta
   end
   return out
 end
@@ -108,14 +130,14 @@ function source:completion_for_source(line)
   -- if we are using e.g. {{ source('source_name', ) }} then we want
   -- to see all the models for that source_name.
   if self.found_sources then
-    for f, _ in pairs(self.found_sources) do
-      if cursor_before_line:match(f) then
+    for found_source, _ in pairs(self.found_sources) do
+      if cursor_before_line:match(found_source) then
         local out = {}
-        for k, v in pairs(sources) do
-          if k:match(f) then
+        for model, meta in pairs(sources) do
+          if model:match(found_source) then
             -- captures the last part of the string -> model_name
-            k = k:match("([^.]*)$")
-            out[k] = v
+            model = model:match("([^.]*)$")
+            out[model] = meta
           end
         end
         return out
@@ -125,10 +147,10 @@ function source:completion_for_source(line)
 
   -- if we are using e.g. {{ source('') }} then we want
   -- to see all the sources.
-  for k, v in pairs(sources) do
+  for model, meta in pairs(sources) do
     -- captures the 2nd to last part of the string -> source_name
-    k = k:match("([^%.]+)%.[^%.]+$")
-    self.found_sources[k] = v
+    model = model:match("([^%.]+)%.[^%.]+$")
+    self.found_sources[model] = meta
   end
   return self.found_sources
 end
