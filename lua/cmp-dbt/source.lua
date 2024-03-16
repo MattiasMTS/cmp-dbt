@@ -14,6 +14,7 @@ function source:new()
     manifest = {},
     manifest_path = "",
     found_sources = {},
+    found_macros = {},
     enable_reserved_keywords = false, -- TODO: add from config later
   }
   setmetatable(cls, self)
@@ -61,7 +62,6 @@ local function convert_many_to_completion_item(items)
   return out
 end
 
--- TODO: continue here, add e.g. column completion, macros, test, etc.
 function source:get_completion()
   local out = {}
   local cursor_before_line = utils:get_cursor_before_line()
@@ -104,6 +104,11 @@ function source:get_completion()
     utils:merge_tables(out, nodes)
   end
 
+  local macros = self:completion_for_macros(cursor_before_line)
+  if macros then
+    utils:merge_tables(out, macros)
+  end
+
   -- add columns to completion if they exist in metadata
   if #self.latest_ts_structure > 0 then
     for _, ts in ipairs(self.latest_ts_structure) do
@@ -139,12 +144,32 @@ function source:completion_for_macros(line)
   local macros = self.manifest.macros or {}
   local cursor_before_line = line or utils:get_cursor_before_line()
 
-  local out = {}
-  for model, meta in pairs(macros) do
-    model = model:match("([^.]*)$")
-    out[model] = meta
+  -- if we are using e.g. <macro_name>.<model_name> then we want model_name:
+  if self.found_macros then
+    for macro, _ in pairs(self.found_macros) do
+      if cursor_before_line:match(macro) then
+        local out = {}
+        for model, meta in pairs(macros) do
+          if model:match(macro) then
+            -- captures the last part of the string -> model_name
+            model = model:match("([^.]*)$")
+            out[model] = meta
+          end
+        end
+        return out
+      end
+    end
   end
-  return out
+
+  -- if we are using e.g. {{ source('') }} then we want
+  -- to see all the sources.
+  for model, meta in pairs(macros) do
+    -- captures the 2nd to last part of the string -> macro_name
+    model = model:match("([^%.]+)%.[^%.]+$")
+    self.found_macros[model] = meta
+  end
+
+  return self.found_macros
 end
 
 function source:completion_for_source(line)
